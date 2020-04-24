@@ -1,0 +1,5 @@
+!!com.solace.qk.solace.SolConfig
+host: localhost
+msgVpn: default
+clientUsername: default
+clientPassword: default

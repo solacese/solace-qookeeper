@@ -1,0 +1,3 @@
+!!com.solace.qk.QKClientConfig
+groupName: cg1
+serviceAddress: qk/service/cg1

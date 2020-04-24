@@ -1,0 +1,11 @@
+!!com.solace.qk.QKConfig
+groupName: cg1
+hashCount: 101
+queueCount: 8
+queuePrefix: cg/test
+serviceQueue: qkservice/cg1
+serviceTopic: qk/service/cg1
+serviceStatusTopic: qk/service/cg1/update
+topicDefinition: oms/order/{hash}/{instrument}/{id}
+objectClassName: com.solace.qk.TestOrder
+objectIdFieldGetter: getID
