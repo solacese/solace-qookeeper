@@ -7,12 +7,7 @@ For sticky load-balancing to work there must be some amount of coordination and 
 between the producer and whatever manages the persistent streams or partitions of the input, 
 as well as some from the consumer as well.
 
-```text
-            Manager
-              |
-              V
-Producer -> Broker -> Consumer
-```
+![QK Flow](resources/QK_Flow.png)
 
 ## Participants 
 
@@ -20,7 +15,7 @@ I've packaged these requirements into libraries taking away almost all the respo
 configurations to control the behavior.
 
 Let's start from the consumer and work our way backwards.
- 
+
 ### The Consumer
 - Must know what partition to connect and consume from
 - Alternatively, the broker or manager could assign them a partition; in this case the consumer must 
@@ -38,5 +33,16 @@ It must know *how to produce filters in the hashed key-values*.
 - Must understand the data hashing scheme and how to produce messages with the hash.
 - Must be able to serialize the topic for each message.
  
+## Detailed Flow
 
-https://solace.com/blog/sticky-load-balancing-in-solace-pubsub-event-broker/ 
+The more detailed end-to-end flow looks like this then:
+
+![QK Flow](resources/QK_Flow_Annotated.png)
+
+## References
+
+https://solace.com/blog/sticky-load-balancing-in-solace-pubsub-event-broker/
+
+https://solace.com/blog/topic-hierarchy-best-practices/
+
+
