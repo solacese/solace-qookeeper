@@ -175,7 +175,7 @@ library.
     HashingStrategy<Object> hashingStrategy =
             new ReflectionBasedHashingStrategy(maxHashCount, "getId");
     TopicStrategy<Object> strategy =
-            new ReflectionBasedHashingTopicStrategy(Foo.class, "foo/{hash}/{id}/{itemName}", hashingStrategy);
+            new ReflectionBasedHashingTopicStrategy(Order.class, "order/{hash}/{id}/{itemName}", hashingStrategy);
     Serializer<Object> serializer = new OrderSerializer();
 
     Order order = new Order(333, "shoes", 1.2345, 6789);
