@@ -146,7 +146,7 @@ public class QooKeeper<Event> implements DirectMsgHandler {
     /**
      * Infinite loop to be run AFTER initialization of the QK instance is completed.
      * This loop binds to a service queue for Consumer Group service requests
-     * (JOIN and LEAVE requests)
+     * (JOIN and LEAVE requests), handling them, updating the model and responding.
      */
     public void mainListeningLoop() {
         Queue queue = JCSMPFactory.onlyInstance().createQueue(config.getServiceQueue());

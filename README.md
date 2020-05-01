@@ -1,5 +1,7 @@
 # solace-qookeeper
 
+![QK Flow](resources/QK_Flow.png)
+
 A sample implementation of Sticky Load Balancing via Solace PubSub+
 event brokers and Java APIs.  I wanted to do this to get a sense
 of the requirements to achieve this. These requirements are wonderfully
@@ -82,6 +84,36 @@ of consumers on all the queues to distribute the consumers evenly
 across the partitions. The manager tracks bind/unbind events in
 case the consumers don't send requests.
 
+```java
+/** 
+ * Public interface 
+ **/
+public class QooKeeper<Event> {
+    /**
+     * Creates a QK instance for load-balancing a consumer group. Note, this does not Initialize the Consumer Group. See @init().
+     *
+     * @param config Configuration object for this QK instance.
+     * @param session an existing Solace PubSub+ session, wrapped in an accessor object encapsulating events consumed and emitted by this object.
+     * @param hashingStrategy
+     * @param topicStrategy
+     */
+    public QooKeeper(QKConfig config, SolServerWrapper session, HashingStrategy<Event> hashingStrategy, TopicStrategy<Event> topicStrategy);
+
+    /**
+     * Initializes the consumer group infrastructure by: allocating all the expected queues
+     * and subscribing these queues to properly hashed topic-subscriptions that evenly
+     * distribute the keyspace of the Event flow across these queues.
+     */
+    public void init();
+
+    /**
+     * Infinite loop to be run AFTER initialization of the QK instance is completed.
+     * This loop binds to a service queue for Consumer Group service requests
+     * (JOIN and LEAVE requests), handling them, updating the model and responding.
+     */
+    public void mainListeningLoop();
+}
+```
 ## Consumer Client
 
 If application owners are comfortable with managing the consumers,
@@ -93,6 +125,31 @@ to the `Qookeeper` which sends back a response with the name of the
 queue for this application to bind to. This way, consumers are all
 configured the same and are not configured with partitioning details.
 
+```java
+/** 
+ * Public interface 
+ **/
+public class QKClient {
+    public QKClient(QKClientConfig config, ClientEventBusWrapper session);
+
+    /**
+     * Send a join request over the Solace PubSub+ event bus, awaiting the resulting queue name.
+     *
+     * @param consumerGroup String identifying the Consumer Group being joined.
+     * @return String queueName allocated to this client by the QooKeeper service mgr.
+     */
+
+    public String join(String consumerGroup);
+    /**
+     * Send a Leave request over the Solace PubSub+ event bus, awaiting the confirmation of removal by the QooKeeper service mgr.
+     *
+     * @param consumerGroup String identifying the Consumer Group being left.
+     * @return String queueName being left that was previously allocated to this client by the QooKeeper service mgr.
+     */
+    public String leave(String consumerGroup, String queueName);
+
+}
+```
 ## Producer Processes
 
 For the paritioning strategy to work, the Producers must produce
@@ -110,3 +167,19 @@ There are generalized implementations of both classes available in
 my [topic-serialization](https://github.com/koverton/topic-serialization)
 library.
 
+```java
+    /**
+     * Sample producer code
+     **/
+    int maxHashCount = 101;
+    HashingStrategy<Object> hashingStrategy =
+            new ReflectionBasedHashingStrategy(maxHashCount, "getId");
+    TopicStrategy<Object> strategy =
+            new ReflectionBasedHashingTopicStrategy(Foo.class, "foo/{hash}/{id}/{itemName}", hashingStrategy);
+    Serializer<Object> serializer = new OrderSerializer();
+
+    Order order = new Order(333, "shoes", 1.2345, 6789);
+    Topic topic = strategy.makeTopic(order);
+    Message message serializer.serialize(order);
+    eventbus.send(message, topic);
+```
