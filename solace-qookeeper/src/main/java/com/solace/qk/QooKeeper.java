@@ -16,9 +16,32 @@ import java.util.regex.Pattern;
 
 import static com.solace.qk.Protocol.*;
 
+/**
+ * QooKeeper is a Consumer Group service manager for event flows on a specific, expected Event type.
+ * The requirement for this Event type knowledge is to understand how to serialize the topics on
+ * which these events are published, and to understand the hashing strategy of those topics to
+ * ensure balanced allocation of the domain of keys from these events.
+ *
+ * The QooKeeper ensures all the queues for this Consumer Group are provisioned and the Topic Space
+ * is evenly distributed across these queues. It also binds to an inbound service queue listening
+ * for QKClient requests to join or leave the consumer group. The QKClient object provides a simple
+ * interface for consumers to send requests to join the Consumer Group and let the QooKeeper
+ * simply send them the name of the queue to consume from. See also the QKClient object.
+ *
+ * @param <Event> Event type for which this Consumer Group is load-balancing consumers. The event
+ *               type is required on the HashingStrategy and TopicStrategy passed into this object.
+ */
 public class QooKeeper<Event> implements DirectMsgHandler {
     static final private Logger logger = LoggerFactory.getLogger(QooKeeper.class);
 
+    /**
+     * Creates a QK instance for load-balancing a consumer group. Note, this does not Initialize the Consumer Group. See @init().
+     *
+     * @param config Configuration object for this QK instance.
+     * @param session an existing Solace PubSub+ session, wrapped in an accessor object encapsulating events consumed and emitted by this object.
+     * @param hashingStrategy
+     * @param topicStrategy
+     */
     public QooKeeper(QKConfig config, SolServerWrapper session, HashingStrategy<Event> hashingStrategy, TopicStrategy<Event> topicStrategy) {
         this.config = config;
         this.session = session;
@@ -28,12 +51,23 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         this.model = new QKModel(config.getGroupName());
     }
 
+    /**
+     * Initializes the consumer group infrastructure by: allocating all the expected queues
+     * and subscribing these queues to properly hashed topic-subscriptions that evenly
+     * distribute the keyspace of the Event flow across these queues.
+     */
     public void init() {
         List<String> qlist = initQueues();
         initSubscriptions(qlist);
         session.hookClientDisconnectEvent();
     }
 
+    /**
+     * Provisions the underlying set of queues for this Consumer Group. If queues already
+     * exist any exceptions are ignored.
+     *
+     * @return List of String queue names that are provisioned for this Consumer Group.
+     */
     private List<String> initQueues() {
         // Provision our service queue if it doesn't already exist
         Queue svcqueue = session.provisionQueue(config.getServiceQueue());
@@ -54,6 +88,12 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         return qlist;
     }
 
+    /**
+     * Ensures a properly-hashed set of topic-subscriptions are added across the
+     * queue list to evenly distribute the Event topicspace across the queues.
+     *
+     * @param qlist List of queue names to be subscribed to the hashed topic-subscriptions.
+     */
     private void initSubscriptions(List<String> qlist) {
         ListIterator<String> buckets = hashingStrategy.getBuckets().listIterator();
         ListIterator<String> queues  = qlist.listIterator();
@@ -67,6 +107,17 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         }
     }
 
+    /**
+     * A subscription is expressed as a set of field-based filters in the form:
+     *  'field-name 1' : 'a*'
+     *  'field-name 2' : 'NYSE001',
+     *  ...
+     * This subscription is hashed and serialized to a topic-subscription string
+     * and added to this queue to attract Events matching this subscription.
+     *
+     * @param queue queue instance to be subscribed to the provided filter-expression.
+     * @param filters list of field-based filters to be added to this queues subscriptions.
+     */
     private void addSubscription(Queue queue, Map<String,String> filters) {
         Topic subscriptionTopic = topicStrategy.makeSubscription(filters);
         if (!session.subscribeQueue(queue, subscriptionTopic, true)) {
@@ -75,9 +126,13 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         }
     }
 
+    /**
+     * Listen for disconnect events to remove them from allocated queues
+     */
     final private Pattern pattern = Pattern.compile(".+/CLIENT_CLIENT_DISCONNECT/[^/]+/(.+)");
+    @Override
     public void onDirectMessage(BytesXMLMessage message) {
-        // Only use this for connect/disconnect events
+        // Only using this for disconnect events (for now)
         String topic = message.getDestination().getName();
         Matcher matcher = pattern.matcher(topic);
         if (matcher.matches()) {
@@ -88,6 +143,11 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         }
     }
 
+    /**
+     * Infinite loop to be run AFTER initialization of the QK instance is completed.
+     * This loop binds to a service queue for Consumer Group service requests
+     * (JOIN and LEAVE requests)
+     */
     public void mainListeningLoop() {
         Queue queue = JCSMPFactory.onlyInstance().createQueue(config.getServiceQueue());
         FlowReceiver receiver = session.bindQueue(queue);
@@ -127,6 +187,15 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         }
     }
 
+    /**
+     * Handle a join request by identifying a queue with the fewest consumers, allocating this
+     * client to that queue and tracking that mapping in the model, and sending a response
+     * event back to the requester with the name of the queue they are to bind to.
+     *
+     * @param request request object including the client-name to be added to the Consumer Group.
+     * @param reqmsg underlying Solace event being responded to.
+     * @throws Exception
+     */
     private void handleJoinRequest(JSONObject request, BytesXMLMessage reqmsg) throws Exception {
         // Choose the next queue for them
         String queueName = model.nextQueue();
@@ -137,6 +206,14 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         session.sendJoinResult(reqmsg, queueName, clientName);
     }
 
+    /**
+     * Handle a leave request by identifying this client+queue and removing them from the
+     * allocation model. This allows updated balancing of further consumers across the queues.
+     *
+     * @param request request object including the client-name and queue to be removed from the Consumer Group.
+     * @param reqmsg underlying Solace event being responded to.
+     * @throws Exception
+     */
     private void handleLeaveRequest(JSONObject request, BytesXMLMessage reqmsg) throws Exception {
         String clientName = (String)request.get(CLIENTNAME);
         String queueName = (String)request.get(QUEUENAME);
@@ -154,7 +231,11 @@ public class QooKeeper<Event> implements DirectMsgHandler {
     final private QKModel model;
 
 
-
+    /**
+     * QOOKEEPER ENTRYPOINT
+     *
+     * @param args USAGE: <solace-config-file.yml> <qk-config-file.yml>
+     */
     static public void main(String[] args) {
 
         if (args.length < 2) {

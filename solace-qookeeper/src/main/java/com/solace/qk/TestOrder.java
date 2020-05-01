@@ -1,5 +1,8 @@
 package com.solace.qk;
 
+/**
+ * Sample order object for the ClientChurnTest.
+ */
 public class TestOrder {
     public enum Side { BUY, SELL }
     public TestOrder(long id, Side side, String instrument, double price, double quantity) {

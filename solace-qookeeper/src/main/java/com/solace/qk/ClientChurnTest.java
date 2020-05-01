@@ -9,6 +9,12 @@ import com.solacesystems.jcsmp.*;
 
 import java.util.*;
 
+/**
+ * A system test that starts several QKCLient instances and cycle through them
+ * joining and leaving the same Consumer Group. This provides a useful and
+ * interesting client load for testing the QooKeeper model for load-balancing a
+ * Consumer Group.
+ */
 class ClientChurnTest {
     static private class StubQueueListener implements XMLMessageListener {
         public void onReceive(BytesXMLMessage bytesXMLMessage) { }

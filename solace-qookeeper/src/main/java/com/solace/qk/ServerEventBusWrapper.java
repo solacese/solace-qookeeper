@@ -6,6 +6,9 @@ import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.Topic;
 import org.json.simple.JSONObject;
 
+/**
+ * Convenience wrapper around an existing EventBus connection that implements the server side of the QooKeeper protocol.
+ */
 public interface ServerEventBusWrapper {
 
     Queue provisionQueue(String name);

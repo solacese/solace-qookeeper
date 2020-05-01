@@ -6,6 +6,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+/**
+ * QooKeeper service manager configuration object. This is serialized for event transmission by org.yaml.snakeyaml.
+ */
 public class QKConfig {
 
     public QKConfig() { }
