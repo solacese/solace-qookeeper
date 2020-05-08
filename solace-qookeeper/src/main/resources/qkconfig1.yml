@@ -8,4 +8,4 @@ serviceTopic: qk/service/cg1
 serviceStatusTopic: qk/service/cg1/update
 topicDefinition: oms/order/{hash}/{instrument}/{id}
 objectClassName: com.solace.qk.TestOrder
-objectIdFieldGetter: getID
+objectIdFieldGetter: getId

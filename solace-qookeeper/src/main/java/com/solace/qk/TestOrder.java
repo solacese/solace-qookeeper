@@ -34,4 +34,15 @@ public class TestOrder {
     private double price;
     private double quantity;
     private Side side;
+
+    @Override
+    public String toString() {
+        return "{" +
+                "\"id\":" + id +
+                ", \"side\":" + side +
+                ", \"instrument\":\"" + instrument + "\"" +
+                ", \"price\":" + price +
+                ", \"quantity\":" + quantity +
+                '}';
+    }
 }

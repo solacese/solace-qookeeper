@@ -17,7 +17,7 @@ import java.util.*;
  */
 class ClientChurnTest {
     static private class StubQueueListener implements XMLMessageListener {
-        public void onReceive(BytesXMLMessage bytesXMLMessage) { }
+        public void onReceive(BytesXMLMessage msg) { msg.ackMessage(); }
         public void onException(JCSMPException e) { }
     }
 
@@ -47,6 +47,7 @@ class ClientChurnTest {
                     // Join all the available queues
                     String qname = client.join(clientConfig.getGroupName());
                     FlowReceiver binding = connector.bindQueue(qname, listener);
+                    binding.start();
                     System.out.println("Joined Queue: " + qname);
                     joinedQueues.put(qname, binding);
                     Thread.sleep(1000);
