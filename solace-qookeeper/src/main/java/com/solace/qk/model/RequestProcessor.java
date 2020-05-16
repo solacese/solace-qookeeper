@@ -7,6 +7,8 @@ import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static com.solace.qk.Protocol.*;
 
 public class RequestProcessor {
@@ -16,6 +18,8 @@ public class RequestProcessor {
         this.session = session;
         this.model = model;
         this.serviceStatusTopic = outputStatusTopic;
+        this.joins = 0;
+        this.leaves = 0;
     }
 
     /**
@@ -36,6 +40,7 @@ public class RequestProcessor {
                 logger.warn("Unknown msgtype {}", msgtype);
             // Send out model update
             session.sendStatusUpdate(model.getModel(), this.serviceStatusTopic);
+            logger.info("JOINS {}:{} LEAVES", joins, leaves);
         }
         catch(Exception ex) {
             logger.error("EXCEPTION handling msgtype='"+ msgTypeString(msgtype), ex);
@@ -54,6 +59,7 @@ public class RequestProcessor {
      */
     private void handleJoinRequest(JSONObject request, BytesXMLMessage reqmsg) throws Exception {
         // Choose the next queue for them
+        joins++;
         String queueName = model.nextQueue();
         String clientName = (String)request.get(CLIENTNAME);
         logger.info("Assigning client [{}] to queue [{}]", clientName, queueName);
@@ -71,6 +77,7 @@ public class RequestProcessor {
      * @throws Exception
      */
     private void handleLeaveRequest(JSONObject request, BytesXMLMessage reqmsg) throws Exception {
+        leaves++;
         String clientName = (String)request.get(CLIENTNAME);
         String queueName  = (String)request.get(QUEUENAME);
         if (queueName.equals("*")) {
@@ -91,4 +98,6 @@ public class RequestProcessor {
     final private SolServerWrapper session;
     final private QKModel model;
     final private String serviceStatusTopic;
+    private int joins;
+    private int leaves;
 }

@@ -99,7 +99,7 @@ public class QKModel {
             Map.Entry entry = (Map.Entry)o;
             String queue = (String) entry.getKey();
             JSONArray clients = (JSONArray) entry.getValue();
-            if (clients.remove(client)) {
+                while (clients.remove(client)) {
                 logger.info("Removing " + client + " from queue " + queue);
                 ++count;
             }
@@ -126,6 +126,9 @@ public class QKModel {
         boolean success = clients.remove(client);
         if (success)
             queueList.sort();
+        else {
+            logger.warn("Failed to remove {} from {} => {}", client, queueName, clients.toJSONString());
+        }
         logger.info(queueList.toString());
         return success;
     }
