@@ -2,6 +2,7 @@ package com.solace.qk;
 
 import com.solace.dev.*;
 import com.solace.qk.model.QKModel;
+import com.solace.qk.model.RequestProcessor;
 import com.solace.qk.solace.*;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.Queue;
@@ -49,6 +50,7 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         this.topicStrategy   = topicStrategy;
         // this is where we will track all clients
         this.model = new QKModel(config.getGroupName());
+        this.processor = new RequestProcessor(session, model, config.getServiceStatusTopic());
     }
 
     /**
@@ -137,9 +139,8 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         Matcher matcher = pattern.matcher(topic);
         if (matcher.matches()) {
             String client = matcher.group(1);
-            logger.warn("TRYING TO REMOVE CLIENT: " + client);
-            int count = model.removeClient(client);
-            logger.warn("Removed {} queue bindings for {}", count, client);
+            JSONObject leaveAllRequest = newLeaveRequest(config.getGroupName(), client, "*");
+            processor.onRequest(leaveAllRequest, null);
         }
     }
 
@@ -155,31 +156,13 @@ public class QooKeeper<Event> implements DirectMsgHandler {
             while(true) {
                 // wait until we receive a request message
                 BytesXMLMessage reqmsg = receiver.receive();
-                if (reqmsg instanceof TextMessage) {
-                    // Parse and log the inbound message
-                    String text = ((TextMessage)reqmsg).getText();
-                    logger.info("QKPR:RECV<< " + text);
-                    JSONObject request = (JSONObject) JSONValue.parse( text );
-                    if (request == null) {
-                        logger.error("Could not parse inbound request: {}", text);
-                        continue;
-                    }
-
-                    // Handle JSON request objects
-                    long msgtype = (Long)request.get(MSGTYPE);
-                    if (msgtype == JOINREQUEST)
-                        handleJoinRequest(request, reqmsg);
-                    else if(msgtype == LEAVEREQUEST)
-                        handleLeaveRequest(request, reqmsg);
-                    else
-                        logger.warn("Unknown msgtype {}", msgtype);
-
-                    // Send out model update
-                    session.sendStatusUpdate(model.getModel(), config.getServiceStatusTopic());
+                JSONObject request = parseMsg(reqmsg);
+                if (request == null)
+                    logger.error("No valid request input");
+                else {
+                    processor.onRequest(request, reqmsg);
                     reqmsg.ackMessage();
-                    continue;
                 }
-                logger.error("No valid request input");
             }
         }
         catch(Exception ex) {
@@ -187,48 +170,12 @@ public class QooKeeper<Event> implements DirectMsgHandler {
         }
     }
 
-    /**
-     * Handle a join request by identifying a queue with the fewest consumers, allocating this
-     * client to that queue and tracking that mapping in the model, and sending a response
-     * event back to the requester with the name of the queue they are to bind to.
-     *
-     * @param request request object including the client-name to be added to the Consumer Group.
-     * @param reqmsg underlying Solace event being responded to.
-     * @throws Exception
-     */
-    private void handleJoinRequest(JSONObject request, BytesXMLMessage reqmsg) throws Exception {
-        // Choose the next queue for them
-        String queueName = model.nextQueue();
-        String clientName = (String)request.get(CLIENTNAME);
-        logger.info("Assigning client [{}] to queue [{}]", clientName, queueName);
-        model.addClient(queueName, clientName);
-        // Send result
-        session.sendJoinResult(reqmsg, queueName, clientName);
-    }
-
-    /**
-     * Handle a leave request by identifying this client+queue and removing them from the
-     * allocation model. This allows updated balancing of further consumers across the queues.
-     *
-     * @param request request object including the client-name and queue to be removed from the Consumer Group.
-     * @param reqmsg underlying Solace event being responded to.
-     * @throws Exception
-     */
-    private void handleLeaveRequest(JSONObject request, BytesXMLMessage reqmsg) throws Exception {
-        String clientName = (String)request.get(CLIENTNAME);
-        String queueName = (String)request.get(QUEUENAME);
-        if(!model.removeClient(queueName, clientName)) {
-            logger.warn("Client thought they were leaving {" + queueName + "} but not removed");
-        }
-        // send leave result
-        session.sendLeaveResult(reqmsg, queueName, clientName);
-    }
-
     final private QKConfig config;
     final private HashingStrategy<Event> hashingStrategy;
     final private TopicStrategy<Event> topicStrategy;
     final private SolServerWrapper session;
     final private QKModel model;
+    final private RequestProcessor processor;
 
 
     /**

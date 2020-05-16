@@ -49,4 +49,19 @@ class SortableEntryList {
             }
         });
     }
+
+    @Override
+    public String toString() {
+        StringBuilder bldr = new StringBuilder();
+        bldr.append("queues\n{\n");
+        for(Map.Entry e : orderedQueues) {
+            bldr.append("\t")
+                    .append((e.getKey()))
+                    .append(" : ")
+                    .append(((JSONArray)e.getValue()).size())
+                    .append(",\n");
+        }
+        bldr.append("}\n");
+        return bldr.toString();
+    }
 }

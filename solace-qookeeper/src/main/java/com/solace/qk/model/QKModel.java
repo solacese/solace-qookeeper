@@ -80,6 +80,7 @@ public class QKModel {
         JSONArray clients = (JSONArray) queueConsumers.get(queueName);
         clients.add(client);
         queueList.sort();
+        logger.info(queueList.toString());
     }
 
     /**
@@ -105,6 +106,7 @@ public class QKModel {
         }
         // Re-order our list of queues based on the number of clients
         if (count > 0) queueList.sort();
+        logger.info(queueList.toString());
         return count;
     }
 
@@ -124,6 +126,7 @@ public class QKModel {
         boolean success = clients.remove(client);
         if (success)
             queueList.sort();
+        logger.info(queueList.toString());
         return success;
     }
 
